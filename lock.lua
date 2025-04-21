@@ -1,161 +1,114 @@
-getgenv().AimPart = "Head" -- For R15 Games: {UpperTorso, LowerTorso, HumanoidRootPart, Head} | For R6 Games: {Head, Torso, HumanoidRootPart}
-getgenv().AimlockKey = "p"
-getgenv().AimRadius = 30 
-getgenv().ThirdPerson = true 
-getgenv().FirstPerson = true
-getgenv().TeamCheck = false -- Check if Target is on your Team (True means it wont lock onto your teamates, false is vice versa) (Set it to false if there are no teams)
-getgenv().PredictMovement = true -- Predicts if they are moving in fast velocity (like jumping) so the aimbot will go a bit faster to match their speed 
-getgenv().PredictionVelocity = 8.8
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-local Players, Uis, RService, SGui = game:GetService"Players", game:GetService"UserInputService", game:GetService"RunService", game:GetService"StarterGui";
-local Client, Mouse, Camera, CF, RNew, Vec3, Vec2 = Players.LocalPlayer, Players.LocalPlayer:GetMouse(), workspace.CurrentCamera, CFrame.new, Ray.new, Vector3.new, Vector2.new;
-local Aimlock, MousePressed, CanNotify = true, false, false;
-local AimlockTarget;
-getgenv().CiazwareUniversalAimbotLoaded = true
+local player = Players.LocalPlayer
+local camera = game.Workspace.CurrentCamera
+local camlockEnabled = false
 
-getgenv().WorldToViewportPoint = function(P)
-    return Camera:WorldToViewportPoint(P)
-end
+-- Create Notification
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
-getgenv().WorldToScreenPoint = function(P)
-    return Camera.WorldToScreenPoint(Camera, P)
-end
+local Notification = Instance.new("TextLabel")
+Notification.Parent = ScreenGui
+Notification.Size = UDim2.new(0, 250, 0, 50)
+Notification.Position = UDim2.new(0.5, -125, 0.1, 0)
+Notification.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+Notification.Text = "Camlock Enabled"
+Notification.Font = Enum.Font.SourceSansBold
+Notification.TextSize = 20
 
-getgenv().GetObscuringObjects = function(T)
-    if T and T:FindFirstChild(getgenv().AimPart) and Client and Client.Character:FindFirstChild("Head") then 
-        local RayPos = workspace:FindPartOnRay(RNew(
-            T[getgenv().AimPart].Position, Client.Character.Head.Position)
-        )
-        if RayPos then return RayPos:IsDescendantOf(T) end
-    end
-end
+wait(3) -- Remove the notification after 3 seconds
+Notification:Destroy()
 
-getgenv().GetNearestTarget = function()
-    -- Credits to whoever made this, i didnt make it, and my own mouse2plr function kinda sucks
-    local players = {}
-    local PLAYER_HOLD  = {}
-    local DISTANCES = {}
-    for i, v in pairs(Players:GetPlayers()) do
-        if v ~= Client then
-            table.insert(players, v)
-        end
-    end
-    for i, v in pairs(players) do
-        if v.Character ~= nil then
-            local AIM = v.Character:FindFirstChild("Head")
-            if getgenv().TeamCheck == true and v.Team ~= Client.Team then
-                local DISTANCE = (v.Character:FindFirstChild("Head").Position - game.Workspace.CurrentCamera.CFrame.p).magnitude
-                local RAY = Ray.new(game.Workspace.CurrentCamera.CFrame.p, (Mouse.Hit.p - game.Workspace.CurrentCamera.CFrame.p).unit * DISTANCE)
-                local HIT,POS = game.Workspace:FindPartOnRay(RAY, game.Workspace)
-                local DIFF = math.floor((POS - AIM.Position).magnitude)
-                PLAYER_HOLD[v.Name .. i] = {}
-                PLAYER_HOLD[v.Name .. i].dist= DISTANCE
-                PLAYER_HOLD[v.Name .. i].plr = v
-                PLAYER_HOLD[v.Name .. i].diff = DIFF
-                table.insert(DISTANCES, DIFF)
-            elseif getgenv().TeamCheck == false and v.Team == Client.Team then 
-                local DISTANCE = (v.Character:FindFirstChild("Head").Position - game.Workspace.CurrentCamera.CFrame.p).magnitude
-                local RAY = Ray.new(game.Workspace.CurrentCamera.CFrame.p, (Mouse.Hit.p - game.Workspace.CurrentCamera.CFrame.p).unit * DISTANCE)
-                local HIT,POS = game.Workspace:FindPartOnRay(RAY, game.Workspace)
-                local DIFF = math.floor((POS - AIM.Position).magnitude)
-                PLAYER_HOLD[v.Name .. i] = {}
-                PLAYER_HOLD[v.Name .. i].dist= DISTANCE
-                PLAYER_HOLD[v.Name .. i].plr = v
-                PLAYER_HOLD[v.Name .. i].diff = DIFF
-                table.insert(DISTANCES, DIFF)
-            end
-        end
-    end
-    
-    if unpack(DISTANCES) == nil then
-        return nil
-    end
-    
-    local L_DISTANCE = math.floor(math.min(unpack(DISTANCES)))
-    if L_DISTANCE > getgenv().AimRadius then
-        return nil
-    end
-    
-    for i, v in pairs(PLAYER_HOLD) do
-        if v.diff == L_DISTANCE then
-            return v.plr
-        end
-    end
-    return nil
-end
+-- Create Draggable UI
+local CamlockFrame = Instance.new("Frame")
+CamlockFrame.Parent = ScreenGui
+CamlockFrame.Size = UDim2.new(0, 100, 0, 50)
+CamlockFrame.Position = UDim2.new(0.8, 0, 0.1, 0)
+CamlockFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+CamlockFrame.BorderSizePixel = 2
+CamlockFrame.Active = true
+CamlockFrame.Draggable = true
 
-Mouse.KeyDown:Connect(function(a)
-    if a == AimlockKey and AimlockTarget == nil then
-        pcall(function()
-            if MousePressed ~= true then MousePressed = true end 
-            local Target;Target = GetNearestTarget()
-            if Target ~= nil then 
-                AimlockTarget = Target
-            end
-        end)
-    elseif a == AimlockKey and AimlockTarget ~= nil then
-        if AimlockTarget ~= nil then AimlockTarget = nil end
-        if MousePressed ~= false then 
-            MousePressed = false 
-        end
-    end
+-- Create Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Parent = CamlockFrame
+TitleBar.Size = UDim2.new(1, 0, 0, 15)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+
+-- Create Button
+local CamlockButton = Instance.new("TextButton")
+CamlockButton.Parent = CamlockFrame
+CamlockButton.Size = UDim2.new(1, 0, 1, -15)
+CamlockButton.Position = UDim2.new(0, 0, 0, 15)
+CamlockButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+CamlockButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CamlockButton.Font = Enum.Font.SourceSansBold
+CamlockButton.TextSize = 20
+CamlockButton.Text = "Camlock"
+
+-- Enable/Disable Camlock
+CamlockButton.MouseButton1Click:Connect(function()
+    camlockEnabled = not camlockEnabled
+    CamlockButton.Text = camlockEnabled and "On" or "Off"
 end)
---[[
-Mouse.KeyDown:Connect(function(a)
-    if a == AimlockToggleKey then
-        Aimlock = not Aimlock
-    end
-end)
-]]
-RService.RenderStepped:Connect(function()
-    if getgenv().ThirdPerson == true and getgenv().FirstPerson == true then 
-        if (Camera.Focus.p - Camera.CoordinateFrame.p).Magnitude > 1 or (Camera.Focus.p - Camera.CoordinateFrame.p).Magnitude <= 1 then 
-            CanNotify = true 
-        else 
-            CanNotify = false 
-        end
-    elseif getgenv().ThirdPerson == true and getgenv().FirstPerson == false then 
-        if (Camera.Focus.p - Camera.CoordinateFrame.p).Magnitude > 1 then 
-            CanNotify = true 
-        else 
-            CanNotify = false 
-        end
-    elseif getgenv().ThirdPerson == false and getgenv().FirstPerson == true then 
-        if (Camera.Focus.p - Camera.CoordinateFrame.p).Magnitude <= 1 then 
-            CanNotify = true 
-        else 
-            CanNotify = false 
-        end
-    end
-    if Aimlock == true and MousePressed == true then 
-        if AimlockTarget and AimlockTarget.Character and AimlockTarget.Character:FindFirstChild(getgenv().AimPart) then 
-            if getgenv().FirstPerson == true then
-                if CanNotify == true then
-                    if getgenv().PredictMovement == true then 
-                        Camera.CFrame = CF(Camera.CFrame.p, AimlockTarget.Character[getgenv().AimPart].Position + AimlockTarget.Character[getgenv().AimPart].Velocity/PredictionVelocity)
-                    elseif getgenv().PredictMovement == false then 
-                        Camera.CFrame = CF(Camera.CFrame.p, AimlockTarget.Character[getgenv().AimPart].Position)
-                    end
+
+-- Find Nearest Player
+local function getNearestPlayer()
+    local nearestPlayer = nil
+    local shortestDistance = math.huge
+    local myPosition = player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position
+
+    if myPosition then
+        for _, otherPlayer in pairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (myPosition - otherPlayer.Character.HumanoidRootPart.Position).magnitude
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    nearestPlayer = otherPlayer
                 end
-            elseif getgenv().ThirdPerson == true then 
-                if CanNotify == true then
-                    if getgenv().PredictMovement == true then 
-                        Camera.CFrame = CF(Camera.CFrame.p, AimlockTarget.Character[getgenv().AimPart].Position + AimlockTarget.Character[getgenv().AimPart].Velocity/PredictionVelocity)
-                    elseif getgenv().PredictMovement == false then 
-                        Camera.CFrame = CF(Camera.CFrame.p, AimlockTarget.Character[getgenv().AimPart].Position)
-                    end
-                end 
             end
         end
     end
+    return nearestPlayer
+end
+
+-- Aim at Target
+RunService.RenderStepped:Connect(function()
+    if camlockEnabled then
+        local targetPlayer = getNearestPlayer()
+        if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head") then
+            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPlayer.Character.Head.Position)
+        end
+    end
 end)
-getgenv().keytoclick = "p"
-tool = Instance.new("Tool")
-tool.RequiresHandle = false
-tool.Name = keytoclick
-tool.Activated:connect(function()
-    local vim = game:service("VirtualInputManager")
-vim:SendKeyEvent(true, keytoclick, false, game)
+
+-- Make UI Resizable by Dragging Edges
+local resizing = false
+local resizeStart = nil
+local frameStartSize = nil
+
+CamlockFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and input.Position.X > CamlockFrame.AbsolutePosition.X + CamlockFrame.AbsoluteSize.X - 10
+       and input.Position.Y > CamlockFrame.AbsolutePosition.Y + CamlockFrame.AbsoluteSize.Y - 10 then
+        resizing = true
+        resizeStart = Vector2.new(input.Position.X, input.Position.Y)
+        frameStartSize = CamlockFrame.Size
+    end
 end)
-tool.Parent = game.Players.LocalPlayer.Backpack
-wait(0.2)
+
+UserInputService.InputChanged:Connect(function(input)
+    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local sizeDelta = Vector2.new(input.Position.X, input.Position.Y) - resizeStart
+        CamlockFrame.Size = UDim2.new(0, math.clamp(frameStartSize.X.Offset + sizeDelta.X, 50, 300), 0, math.clamp(frameStartSize.Y.Offset + sizeDelta.Y, 50, 150))
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = false
+    end
+end)
